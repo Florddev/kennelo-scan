@@ -62,6 +62,15 @@ void loop()
         }
     }
 
+    static unsigned long lastStatusPrint = 0;
+    if (millis() - lastStatusPrint > 3000)
+    {
+        lastStatusPrint = millis();
+        Serial.printf("[STATUS] mode=%s wifi=%s\n",
+            _btMode ? "BLUETOOTH" : "WIFI",
+            wifiIsConnected() ? "connecté" : "déconnecté");
+    }
+
     if (_btMode)
     {
         bluetoothLoop();
