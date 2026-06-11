@@ -78,6 +78,7 @@ void loop()
         {
             bluetoothEnd();
             _btMode = false;
+            wifiBegin();
             wifiReset();
         }
         return;

@@ -251,6 +251,10 @@ void bluetoothBegin()
     rxChar->setAccessPermissions(ESP_GATT_PERM_WRITE_ENCRYPTED);
 
     service->start();
+
+    BLEAdvertising *adv = BLEDevice::getAdvertising();
+    adv->addServiceUUID(SERVICE_UUID);
+    adv->setScanResponse(true);
     BLEDevice::startAdvertising();
 }
 
