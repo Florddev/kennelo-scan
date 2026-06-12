@@ -40,11 +40,30 @@ void setup()
 
 void loop()
 {
-    if (buttonLoop() == BTN_HOLD_SLEEP)
+    ButtonEvent evt = buttonLoop();
+
+    if (evt == BTN_HOLD_SLEEP)
     {
         queueSave();
         if (_btMode) bluetoothEnd();
         buttonGoToSleep();
+    }
+    else if (evt == BTN_TRIPLE_CLICK)
+    {
+        if (!_btMode)
+        {
+            Serial.println("[MAIN] triple-click → mode BLE");
+            _btMode = true;
+            bluetoothBegin();
+        }
+        else
+        {
+            Serial.println("[MAIN] triple-click → retour mode WiFi");
+            bluetoothEnd();
+            _btMode = false;
+            wifiBegin();
+            wifiReset();
+        }
     }
 
     rfidLoop();

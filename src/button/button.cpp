@@ -5,9 +5,13 @@
 #define BUTTON_PIN          0
 #define HOLD_SLEEP_MS       2500
 #define BT_MODE_HOLD_MS     4000
+#define CLICK_MAX_MS         400
+#define TRIPLE_WIN_MS       1000
 
-static bool          _pressing  = false;
-static unsigned long _pressStart = 0;
+static bool          _pressing      = false;
+static unsigned long _pressStart    = 0;
+static int           _clickCount    = 0;
+static unsigned long _firstClickAt  = 0;
 
 void buttonBegin()
 {
@@ -45,14 +49,34 @@ ButtonEvent buttonLoop()
     }
     else if (!pressed && _pressing)
     {
+        unsigned long held = millis() - _pressStart;
         _pressing = false;
-        Serial.printf("[BTN] relâché après %lums\n", millis() - _pressStart);
+        Serial.printf("[BTN] relâché après %lums\n", held);
+
+        if (held < CLICK_MAX_MS)
+        {
+            if (_clickCount == 0) _firstClickAt = millis();
+            _clickCount++;
+            Serial.printf("[BTN] click %d/3\n", _clickCount);
+            if (_clickCount >= 3)
+            {
+                _clickCount = 0;
+                return BTN_TRIPLE_CLICK;
+            }
+        }
+    }
+
+    if (_clickCount > 0 && (millis() - _firstClickAt) > TRIPLE_WIN_MS)
+    {
+        Serial.println("[BTN] fenêtre triple-click expirée");
+        _clickCount = 0;
     }
 
     if (_pressing && (millis() - _pressStart) >= HOLD_SLEEP_MS)
     {
         Serial.println("[BTN] maintien long → sleep");
-        _pressing = false;
+        _pressing   = false;
+        _clickCount = 0;
         return BTN_HOLD_SLEEP;
     }
 

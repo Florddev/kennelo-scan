@@ -3,7 +3,8 @@
 enum ButtonEvent
 {
     BTN_NONE,
-    BTN_HOLD_SLEEP
+    BTN_HOLD_SLEEP,
+    BTN_TRIPLE_CLICK
 };
 
 void buttonBegin();
