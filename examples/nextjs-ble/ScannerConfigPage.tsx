@@ -8,7 +8,7 @@ import { WifiSavedList } from './components/WifiSavedList';
 import { WifiAddForm } from './components/WifiAddForm';
 
 export default function ScannerConfigPage() {
-  const { connected, connecting, error, connect, disconnect, send, subscribe } = useScannerBle();
+  const { connected, connecting, scanning, devices, error, startScan, connectTo, disconnect, send, subscribe } = useScannerBle();
   const [selectedSsid, setSelectedSsid] = useState<string | null>(null);
 
   return (
@@ -18,8 +18,11 @@ export default function ScannerConfigPage() {
       <ScannerConnect
         connected={connected}
         connecting={connecting}
+        scanning={scanning}
+        devices={devices}
         error={error}
-        onConnect={connect}
+        onScan={startScan}
+        onConnect={connectTo}
         onDisconnect={disconnect}
       />
 

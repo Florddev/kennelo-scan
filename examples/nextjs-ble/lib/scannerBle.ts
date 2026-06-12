@@ -1,9 +1,10 @@
 // npm install @capacitor-community/bluetooth-le
-import { BleClient } from '@capacitor-community/bluetooth-le';
+import { BleClient, ScanResult } from '@capacitor-community/bluetooth-le';
 
 const SERVICE_UUID = '19b10000-e8f2-537e-4f6c-d104768a1214';
 const TX_UUID      = '19b10001-e8f2-537e-4f6c-d104768a1214';
 const RX_UUID      = '19b10002-e8f2-537e-4f6c-d104768a1214';
+const SCAN_TIMEOUT = 8000;
 
 export interface ScannerMessage {
   t: string;
@@ -13,7 +14,14 @@ export interface ScannerMessage {
   m?: string;
 }
 
+export interface FoundDevice {
+  deviceId: string;
+  name: string;
+  rssi: number;
+}
+
 type MessageHandler = (msg: ScannerMessage) => void;
+type DeviceFoundHandler = (device: FoundDevice) => void;
 
 function toDataView(text: string): DataView {
   const bytes = new TextEncoder().encode(text);
@@ -29,10 +37,31 @@ class ScannerBle {
   private buffer = '';
   private handlers = new Set<MessageHandler>();
 
-  async connect(): Promise<void> {
+  async checkBluetooth(): Promise<void> {
     await BleClient.initialize();
-    const device = await BleClient.requestDevice({ services: [SERVICE_UUID] });
-    this.deviceId = device.deviceId;
+    const enabled = await BleClient.isEnabled();
+    if (!enabled) throw new Error('BLUETOOTH_DISABLED');
+  }
+
+  async scanDevices(onFound: DeviceFoundHandler): Promise<void> {
+    await this.checkBluetooth();
+    await BleClient.requestLEScan({ services: [SERVICE_UUID] }, (result: ScanResult) => {
+      onFound({
+        deviceId: result.device.deviceId,
+        name: result.device.name ?? 'KenoTag-Scanner',
+        rssi: result.rssi ?? 0,
+      });
+    });
+    setTimeout(() => BleClient.stopLEScan(), SCAN_TIMEOUT);
+  }
+
+  async stopScan(): Promise<void> {
+    await BleClient.stopLEScan();
+  }
+
+  async connectTo(deviceId: string): Promise<void> {
+    await BleClient.initialize();
+    this.deviceId = deviceId;
     await BleClient.connect(this.deviceId, () => {
       this.deviceId = null;
       this.buffer = '';
@@ -41,6 +70,13 @@ class ScannerBle {
     await BleClient.startNotifications(this.deviceId, SERVICE_UUID, TX_UUID, (v) =>
       this.onData(v)
     );
+  }
+
+  // Garde l'ancienne méthode pour compatibilité
+  async connect(): Promise<void> {
+    await BleClient.initialize();
+    const device = await BleClient.requestDevice({ services: [SERVICE_UUID] });
+    await this.connectTo(device.deviceId);
   }
 
   async disconnect(): Promise<void> {
