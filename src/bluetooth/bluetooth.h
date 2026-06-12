@@ -1,6 +1,6 @@
 #pragma once
 
-void bluetoothBegin();
+void bluetoothBegin(const char *scannerCode);
 void bluetoothEnd();
 void bluetoothLoop();
 bool bluetoothHasNewNetwork();

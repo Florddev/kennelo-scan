@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define BLE_DEVICE_NAME "KenoTag-Scanner"
+#define BLE_DEVICE_NAME "KenneloScan"
 #define SERVICE_UUID    "19b10000-e8f2-537e-4f6c-d104768a1214"
 #define CHAR_TX_UUID    "19b10001-e8f2-537e-4f6c-d104768a1214"
 #define CHAR_RX_UUID    "19b10002-e8f2-537e-4f6c-d104768a1214"
@@ -25,6 +25,7 @@ static bool               _newNetworkSaved = false;
 static bool               _hasCommand      = false;
 static bool               _scanInProgress  = false;
 static char               _rxBuffer[256]   = {0};
+static char               _scannerCode[32] = {0};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -159,6 +160,14 @@ static void handleCommand(const char *cmd)
         return;
     }
 
+    if (strstr(cmd, "\"t\":\"info\""))
+    {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "{\"t\":\"info\",\"code\":\"%s\"}", _scannerCode);
+        bleSendLine(msg);
+        return;
+    }
+
     if (strstr(cmd, "\"t\":\"unbond\""))
     {
         int count = esp_ble_get_bond_device_num();
@@ -226,9 +235,14 @@ class RxCB : public BLECharacteristicCallbacks
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-void bluetoothBegin()
+void bluetoothBegin(const char *scannerCode)
 {
-    BLEDevice::init(BLE_DEVICE_NAME);
+    char deviceName[48];
+    snprintf(deviceName, sizeof(deviceName), "%s-%s", BLE_DEVICE_NAME, scannerCode);
+    strncpy(_scannerCode, scannerCode, sizeof(_scannerCode) - 1);
+    _scannerCode[sizeof(_scannerCode) - 1] = '\0';
+
+    BLEDevice::init(deviceName);
     BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT);
 
     BLESecurity *sec = new BLESecurity();
