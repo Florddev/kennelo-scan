@@ -8,7 +8,7 @@
 #include "bluetooth/bluetooth.h"
 #include "storage/storage.h"
 
-#define API_URL "http://10.134.217.230:8000/api/pets/broadcast"
+#define API_URL "http://10.46.60.230:8000/api/pets/broadcast"
 
 static bool _btMode = false;
 static char _scannerCode[9];
@@ -78,13 +78,18 @@ void loop()
     char tag[16];
     if (rfidGetTag(tag, sizeof(tag)))
     {
+        Serial.printf("[SCAN] puce détectée: %s\n", tag);
         if (wifiIsConnected())
         {
             if (!apiSend(tag))
+            {
+                Serial.println("[SCAN] envoi API échoué → mise en file d'attente");
                 queuePush(tag);
+            }
         }
         else
         {
+            Serial.println("[SCAN] WiFi déconnecté → mise en file d'attente");
             queuePush(tag);
         }
     }
@@ -114,7 +119,7 @@ void loop()
     wifiTick();
 
     static unsigned long lastFlush = 0;
-    if (millis() - lastFlush > 10000)
+    if (millis() - lastFlush > 2000)
     {
         lastFlush = millis();
         queueFlush();
