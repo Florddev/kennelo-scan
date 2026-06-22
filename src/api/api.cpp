@@ -1,8 +1,8 @@
 #include "api.h"
 #include <HTTPClient.h>
+#include <ArduinoJson.h>
 
-// Délais courts pour ne pas bloquer la boucle quand le serveur est injoignable.
-#define API_CONNECT_TIMEOUT_MS 1500
+#define API_CONNECT_TIMEOUT_MS  1500
 #define API_RESPONSE_TIMEOUT_MS 5000
 
 static const char *_apiUrl;
@@ -10,12 +10,14 @@ static const char *_scannerCode;
 
 void apiInit(const char *url, const char *scannerCode)
 {
-    _apiUrl = url;
+    _apiUrl      = url;
     _scannerCode = scannerCode;
 }
 
-bool apiSend(const char *tagId, time_t timestamp)
+ApiResult apiSend(const char *tagId, time_t timestamp)
 {
+    ApiResult result = {};
+
     HTTPClient http;
     http.begin(_apiUrl);
     http.addHeader("Content-Type", "application/json");
@@ -42,18 +44,23 @@ bool apiSend(const char *tagId, time_t timestamp)
     Serial.printf("[API] body: %s\n", body);
 
     int code = http.POST(body);
-    String response = http.getString();
 
-    if (code > 0)
-    {
-        Serial.printf("[API] réponse HTTP %d: %s\n", code, response.c_str());
-    }
-    else
-    {
-        Serial.printf("[API] échec requête (%d): %s\n", code, http.errorToString(code).c_str());
+    if (code >= 200 && code < 300) {
+        result.ok = true;
+        String response = http.getString();
+        Serial.printf("[API] réponse %d: %s\n", code, response.c_str());
+
+        StaticJsonDocument<256> doc;
+        if (!deserializeJson(doc, response)) {
+            result.found = doc["found"] | false;
+            strncpy(result.name,    doc["name"]    | "", sizeof(result.name)    - 1);
+            strncpy(result.species, doc["species"] | "", sizeof(result.species) - 1);
+            strncpy(result.breed,   doc["breed"]   | "", sizeof(result.breed)   - 1);
+        }
+    } else {
+        Serial.printf("[API] échec (%d): %s\n", code, http.errorToString(code).c_str());
     }
 
-    bool ok = code >= 200 && code < 300;
     http.end();
-    return ok;
+    return result;
 }

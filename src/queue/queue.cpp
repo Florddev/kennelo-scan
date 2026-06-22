@@ -35,7 +35,7 @@ void queueFlush()
     bool changed = false;
     while (_queueSize > 0 && wifiIsConnected())
     {
-        if (apiSend(_queue[0], _timestamps[0]))
+        if (apiSend(_queue[0], _timestamps[0]).ok)
         {
             removeFirst();
             changed = true;

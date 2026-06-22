@@ -128,7 +128,8 @@ void loop()
                 displaySetAction(DISP_SENDING, tag);
                 displayTick(); // affiche avant l'appel bloquant
 
-                if (!apiSend(tag, ts))
+                ApiResult result = apiSend(tag, ts);
+                if (!result.ok)
                 {
                     Serial.println("[SCAN] envoi API échoué → mise en file d'attente");
                     queuePush(tag, ts);
@@ -137,7 +138,8 @@ void loop()
                 }
                 else
                 {
-                    displaySetAction(DISP_SENT_OK, tag);
+                    Serial.printf("[SCAN] animal: found=%d name=%s\n", result.found, result.name);
+                    displaySetAnimalResult(result.found, result.name, result.species, result.breed);
                 }
             }
             else

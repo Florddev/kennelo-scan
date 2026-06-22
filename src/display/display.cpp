@@ -23,16 +23,19 @@
 static Adafruit_SSD1306 _oled(SCREEN_W, SCREEN_H, &Wire, -1);
 static bool _ready = false;
 
-static char          _code[9]   = "";
-static bool          _bt        = false;
-static bool          _wifi      = false;
-static int           _battery   = -1;
-static bool          _charging  = false;
-static int           _queueSz   = 0;
-static DisplayAction _action    = DISP_IDLE;
-static char          _tag[16]   = "";
-static unsigned long _actionAt  = 0;
-static unsigned long _lastDraw  = 0;
+static char          _code[9]        = "";
+static bool          _bt             = false;
+static bool          _wifi           = false;
+static int           _battery        = -1;
+static bool          _charging       = false;
+static int           _queueSz        = 0;
+static DisplayAction _action         = DISP_IDLE;
+static char          _tag[16]        = "";
+static char          _animalName[32] = "";
+static char          _animalSpec[32] = "";
+static char          _animalBreed[48]= "";
+static unsigned long _actionAt       = 0;
+static unsigned long _lastDraw       = 0;
 
 // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -61,13 +64,23 @@ void displaySetQueueSize(int n)            { _queueSz = n; }
 
 void displaySetAction(DisplayAction action, const char *tag)
 {
-    _action  = action;
+    _action   = action;
     _actionAt = millis();
-    _lastDraw = 0; // force redraw immédiat
+    _lastDraw = 0;
     if (tag) {
         strncpy(_tag, tag, 15);
         _tag[15] = '\0';
     }
+}
+
+void displaySetAnimalResult(bool found, const char *name, const char *species, const char *breed)
+{
+    _action   = found ? DISP_ANIMAL_FOUND : DISP_ANIMAL_UNKNOWN;
+    _actionAt = millis();
+    _lastDraw = 0;
+    strncpy(_animalName,  name    ? name    : "", sizeof(_animalName)  - 1);
+    strncpy(_animalSpec,  species ? species : "", sizeof(_animalSpec)  - 1);
+    strncpy(_animalBreed, breed   ? breed   : "", sizeof(_animalBreed) - 1);
 }
 
 // ── Helpers graphiques ────────────────────────────────────────────────────
@@ -155,10 +168,12 @@ static void _drawStatusBar()
 static void _drawAction()
 {
     // Retour automatique à l'idle pour les états transitoires
-    bool transient = (_action == DISP_SCAN_DETECTED ||
-                      _action == DISP_SENDING       ||
-                      _action == DISP_SENT_OK        ||
-                      _action == DISP_SENT_FAIL);
+    bool transient = (_action == DISP_SCAN_DETECTED  ||
+                      _action == DISP_SENDING        ||
+                      _action == DISP_SENT_OK         ||
+                      _action == DISP_SENT_FAIL       ||
+                      _action == DISP_ANIMAL_FOUND    ||
+                      _action == DISP_ANIMAL_UNKNOWN);
 
     if (transient && (millis() - _actionAt) > ACTION_SHOW_MS)
         _action = DISP_IDLE;
@@ -213,6 +228,21 @@ static void _drawAction()
         case DISP_SENT_FAIL:
             _oled.setCursor(0, 12);
             _oled.print("En file d'attente");
+            _oled.setCursor(0, 22);
+            _oled.print(_tag);
+            break;
+
+        case DISP_ANIMAL_FOUND:
+            _oled.setCursor(0, 12);
+            _oled.print(_animalName);
+            _oled.setCursor(0, 22);
+            snprintf(buf, sizeof(buf), "%s - %s", _animalSpec, _animalBreed);
+            _oled.print(buf);
+            break;
+
+        case DISP_ANIMAL_UNKNOWN:
+            _oled.setCursor(0, 12);
+            _oled.print("Animal inconnu");
             _oled.setCursor(0, 22);
             _oled.print(_tag);
             break;
