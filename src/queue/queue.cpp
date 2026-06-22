@@ -56,6 +56,11 @@ void queueLoad()
     prefs.end();
 }
 
+int queueSize()
+{
+    return _queueSize;
+}
+
 void queueSave()
 {
     Preferences prefs;

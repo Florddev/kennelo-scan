@@ -7,6 +7,7 @@
 #include "button/button.h"
 #include "bluetooth/bluetooth.h"
 #include "storage/storage.h"
+#include "display/display.h"
 
 #define API_URL "http://10.46.60.230:8000/api/pets/broadcast"
 
@@ -24,11 +25,16 @@ void setup()
 
     storageBegin();
     buttonBegin();
+    displayBegin(_scannerCode);
+
     _btMode = buttonCheckBtMode();
+    displaySetBtMode(_btMode);
+
     wifiBegin();
     apiInit(API_URL, _scannerCode);
     rfidBegin();
     queueLoad();
+    displaySetQueueSize(queueSize());
 
     Serial.print("Starting...");
 
@@ -50,6 +56,8 @@ void loop()
 
     if (evt == BTN_HOLD_SLEEP)
     {
+        displaySetAction(DISP_SLEEPING);
+        displayTick();
         queueSave();
         if (_btMode)
             bluetoothEnd();
@@ -61,6 +69,8 @@ void loop()
         {
             Serial.println("[MAIN] triple-click → mode BLE");
             _btMode = true;
+            displaySetBtMode(true);
+            displaySetAction(DISP_IDLE);
             bluetoothBegin(_scannerCode);
         }
         else
@@ -68,6 +78,8 @@ void loop()
             Serial.println("[MAIN] triple-click → retour mode WiFi");
             bluetoothEnd();
             _btMode = false;
+            displaySetBtMode(false);
+            displaySetAction(DISP_IDLE);
             wifiBegin();
             wifiReset();
         }
@@ -79,28 +91,42 @@ void loop()
     if (rfidGetTag(tag, sizeof(tag)))
     {
         Serial.printf("[SCAN] puce détectée: %s\n", tag);
+
         if (wifiIsConnected())
         {
+            displaySetAction(DISP_SENDING, tag);
+            displayTick(); // affiche "Envoi en cours..." avant l'appel bloquant
+
             if (!apiSend(tag))
             {
                 Serial.println("[SCAN] envoi API échoué → mise en file d'attente");
                 queuePush(tag);
+                displaySetAction(DISP_SENT_FAIL, tag);
+                displaySetQueueSize(queueSize());
+            }
+            else
+            {
+                displaySetAction(DISP_SENT_OK, tag);
             }
         }
         else
         {
             Serial.println("[SCAN] WiFi déconnecté → mise en file d'attente");
             queuePush(tag);
+            displaySetAction(DISP_SENT_FAIL, tag);
+            displaySetQueueSize(queueSize());
         }
     }
 
-    static unsigned long lastStatusPrint = 0;
-    if (millis() - lastStatusPrint > 3000)
+    static unsigned long lastStatus = 0;
+    if (millis() - lastStatus > 3000)
     {
-        lastStatusPrint = millis();
+        lastStatus = millis();
+        bool connected = wifiIsConnected();
         Serial.printf("[STATUS] mode=%s wifi=%s\n",
                       _btMode ? "BLUETOOTH" : "WIFI",
-                      wifiIsConnected() ? "connecté" : "déconnecté");
+                      connected ? "connecté" : "déconnecté");
+        displaySetWifiConnected(connected);
     }
 
     if (_btMode)
@@ -110,9 +136,12 @@ void loop()
         {
             bluetoothEnd();
             _btMode = false;
+            displaySetBtMode(false);
+            displaySetAction(DISP_IDLE);
             wifiBegin();
             wifiReset();
         }
+        displayTick();
         return;
     }
 
@@ -123,5 +152,8 @@ void loop()
     {
         lastFlush = millis();
         queueFlush();
+        displaySetQueueSize(queueSize());
     }
+
+    displayTick();
 }
