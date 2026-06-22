@@ -89,20 +89,25 @@ static void _drawWifi(int16_t x, int16_t y)
     }
 }
 
-// Lettre B encadrée — remplie si BT actif, contour seulement sinon
+// Symbole Bluetooth ᛒ en bitmap 8×8
+// col:  0 1 2 3 4 5 6 7
+//       . . . X . . . .   row 0
+//       . . . X X . . .   row 1
+//       . . X . . X . .   row 2
+//       . . . X X . . .   row 3
+//       . . . X X . . .   row 4
+//       . . X . . X . .   row 5
+//       . . . X X . . .   row 6
+//       . . . X . . . .   row 7
+static const uint8_t PROGMEM _iconBT[] = {
+    0x10, 0x18, 0x24, 0x18,
+    0x18, 0x24, 0x18, 0x10,
+};
+
 static void _drawBt(int16_t x, int16_t y)
 {
-    if (_bt) {
-        _oled.fillRect(x, y, 8, 8, WHITE);
-        _oled.setTextColor(BLACK);
-        _oled.setCursor(x + 1, y);
-        _oled.print("B");
-        _oled.setTextColor(WHITE);
-    } else {
-        _oled.drawRect(x, y, 8, 8, WHITE);
-        _oled.setCursor(x + 1, y);
-        _oled.print("B");
-    }
+    if (_bt)
+        _oled.drawBitmap(x, y, _iconBT, 8, 8, WHITE);
 }
 
 // Rectangle batterie (30×8) + capuchon (3×4) + remplissage proportionnel
