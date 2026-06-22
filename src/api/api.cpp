@@ -14,7 +14,7 @@ void apiInit(const char *url, const char *scannerCode)
     _scannerCode = scannerCode;
 }
 
-bool apiSend(const char *tagId)
+bool apiSend(const char *tagId, time_t timestamp)
 {
     HTTPClient http;
     http.begin(_apiUrl);
@@ -23,10 +23,20 @@ bool apiSend(const char *tagId)
     http.setTimeout(API_RESPONSE_TIMEOUT_MS);
     http.setReuse(false);
 
-    char body[128];
-    snprintf(body, sizeof(body),
-             "{\"microchip_number\":\"%s\",\"scanner_code\":\"%s\"}",
-             tagId, _scannerCode);
+    char body[192];
+    if (timestamp > 0) {
+        struct tm t;
+        gmtime_r(&timestamp, &t);
+        char iso[25];
+        strftime(iso, sizeof(iso), "%Y-%m-%dT%H:%M:%SZ", &t);
+        snprintf(body, sizeof(body),
+                 "{\"microchip_number\":\"%s\",\"scanner_code\":\"%s\",\"scanned_at\":\"%s\"}",
+                 tagId, _scannerCode, iso);
+    } else {
+        snprintf(body, sizeof(body),
+                 "{\"microchip_number\":\"%s\",\"scanner_code\":\"%s\"}",
+                 tagId, _scannerCode);
+    }
 
     Serial.printf("[API] POST %s\n", _apiUrl);
     Serial.printf("[API] body: %s\n", body);

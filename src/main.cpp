@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <esp_system.h>
+#include <time.h>
 #include "rfid/rfid.h"
 #include "wifi/wifi.h"
 #include "api/api.h"
@@ -9,10 +10,25 @@
 #include "storage/storage.h"
 #include "display/display.h"
 
-#define API_URL "http://10.46.60.230:8000/api/pets/broadcast"
+#define API_URL          "http://10.46.60.230:8000/api/pets/broadcast"
+#define DEDUP_COOLDOWN_MS 5000
 
 static bool _btMode = false;
 static char _scannerCode[9];
+
+// Dernier tag scanné pour la déduplication
+static char          _lastTag[16]   = "";
+static unsigned long _lastTagAt     = 0;
+
+// Suivi de la connexion WiFi pour déclencher la sync NTP
+static bool _wifiWasConnected = false;
+
+// Retourne le timestamp Unix si le NTP est synchronisé, 0 sinon
+static time_t _getTimestamp()
+{
+    time_t now = time(nullptr);
+    return (now > 1000000000UL) ? now : 0;
+}
 
 void setup()
 {
@@ -90,31 +106,47 @@ void loop()
     char tag[16];
     if (rfidGetTag(tag, sizeof(tag)))
     {
-        Serial.printf("[SCAN] puce détectée: %s\n", tag);
+        // Déduplication : ignorer le même tag pendant DEDUP_COOLDOWN_MS
+        bool isDuplicate = (strcmp(tag, _lastTag) == 0) &&
+                           (millis() - _lastTagAt < DEDUP_COOLDOWN_MS);
 
-        if (wifiIsConnected())
+        if (isDuplicate)
         {
-            displaySetAction(DISP_SENDING, tag);
-            displayTick(); // affiche "Envoi en cours..." avant l'appel bloquant
-
-            if (!apiSend(tag))
-            {
-                Serial.println("[SCAN] envoi API échoué → mise en file d'attente");
-                queuePush(tag);
-                displaySetAction(DISP_SENT_FAIL, tag);
-                displaySetQueueSize(queueSize());
-            }
-            else
-            {
-                displaySetAction(DISP_SENT_OK, tag);
-            }
+            Serial.printf("[SCAN] doublon ignoré: %s\n", tag);
         }
         else
         {
-            Serial.println("[SCAN] WiFi déconnecté → mise en file d'attente");
-            queuePush(tag);
-            displaySetAction(DISP_SENT_FAIL, tag);
-            displaySetQueueSize(queueSize());
+            strncpy(_lastTag, tag, 15);
+            _lastTag[15] = '\0';
+            _lastTagAt   = millis();
+
+            Serial.printf("[SCAN] puce détectée: %s\n", tag);
+            time_t ts = _getTimestamp();
+
+            if (wifiIsConnected())
+            {
+                displaySetAction(DISP_SENDING, tag);
+                displayTick(); // affiche avant l'appel bloquant
+
+                if (!apiSend(tag, ts))
+                {
+                    Serial.println("[SCAN] envoi API échoué → mise en file d'attente");
+                    queuePush(tag, ts);
+                    displaySetAction(DISP_SENT_FAIL, tag);
+                    displaySetQueueSize(queueSize());
+                }
+                else
+                {
+                    displaySetAction(DISP_SENT_OK, tag);
+                }
+            }
+            else
+            {
+                Serial.println("[SCAN] WiFi déconnecté → mise en file d'attente");
+                queuePush(tag, ts);
+                displaySetAction(DISP_SENT_FAIL, tag);
+                displaySetQueueSize(queueSize());
+            }
         }
     }
 
@@ -123,9 +155,20 @@ void loop()
     {
         lastStatus = millis();
         bool connected = wifiIsConnected();
-        Serial.printf("[STATUS] mode=%s wifi=%s\n",
+
+        // Première connexion WiFi : démarrer la sync NTP
+        if (connected && !_wifiWasConnected)
+        {
+            configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+            Serial.println("[NTP] synchronisation démarrée");
+        }
+        _wifiWasConnected = connected;
+
+        Serial.printf("[STATUS] mode=%s wifi=%s ntp=%s\n",
                       _btMode ? "BLUETOOTH" : "WIFI",
-                      connected ? "connecté" : "déconnecté");
+                      connected ? "connecté" : "déconnecté",
+                      (_getTimestamp() > 0) ? "ok" : "en attente");
+
         displaySetWifiConnected(connected);
     }
 

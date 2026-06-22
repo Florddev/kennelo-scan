@@ -7,21 +7,26 @@
 #define QUEUE_MAX_SIZE 50
 #define TAG_MAX_LEN    16
 
-static char _queue[QUEUE_MAX_SIZE][TAG_MAX_LEN];
-static int  _queueSize = 0;
+static char   _queue[QUEUE_MAX_SIZE][TAG_MAX_LEN];
+static time_t _timestamps[QUEUE_MAX_SIZE];
+static int    _queueSize = 0;
 
-void queuePush(const char *tagId)
+void queuePush(const char *tagId, time_t timestamp)
 {
     if (_queueSize >= QUEUE_MAX_SIZE) return;
     strncpy(_queue[_queueSize], tagId, TAG_MAX_LEN - 1);
     _queue[_queueSize][TAG_MAX_LEN - 1] = '\0';
+    _timestamps[_queueSize] = timestamp;
     _queueSize++;
 }
 
 static void removeFirst()
 {
     for (int i = 0; i < _queueSize - 1; i++)
+    {
         strncpy(_queue[i], _queue[i + 1], TAG_MAX_LEN);
+        _timestamps[i] = _timestamps[i + 1];
+    }
     _queueSize--;
 }
 
@@ -30,7 +35,7 @@ void queueFlush()
     bool changed = false;
     while (_queueSize > 0 && wifiIsConnected())
     {
-        if (apiSend(_queue[0]))
+        if (apiSend(_queue[0], _timestamps[0]))
         {
             removeFirst();
             changed = true;
@@ -52,6 +57,8 @@ void queueLoad()
         char key[8];
         snprintf(key, sizeof(key), "t%d", i);
         prefs.getString(key, _queue[i], TAG_MAX_LEN);
+        snprintf(key, sizeof(key), "ts%d", i);
+        _timestamps[i] = (time_t)prefs.getULong(key, 0);
     }
     prefs.end();
 }
@@ -71,6 +78,8 @@ void queueSave()
         char key[8];
         snprintf(key, sizeof(key), "t%d", i);
         prefs.putString(key, _queue[i]);
+        snprintf(key, sizeof(key), "ts%d", i);
+        prefs.putULong(key, (uint32_t)_timestamps[i]);
     }
     prefs.end();
 }
