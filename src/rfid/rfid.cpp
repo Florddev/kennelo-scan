@@ -37,6 +37,11 @@ void rfidBegin()
     rfid.begin();
 }
 
+void rfidEnd()
+{
+    Serial1.end();
+}
+
 void rfidLoop()
 {
     rfid.loop();

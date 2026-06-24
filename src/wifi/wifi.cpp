@@ -35,9 +35,26 @@ void wifiBegin()
     WiFi.mode(WIFI_STA);
 }
 
+void wifiEnd()
+{
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    _state = WIFI_IDLE;
+}
+
 bool wifiIsConnected()
 {
     return WiFi.status() == WL_CONNECTED;
+}
+
+bool wifiIsSearching()
+{
+    return _state == WIFI_SCANNING || _state == WIFI_CONNECTING;
+}
+
+int wifiGetRssi()
+{
+    return WiFi.RSSI();
 }
 
 void wifiReset()

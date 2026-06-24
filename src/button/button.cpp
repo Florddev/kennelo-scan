@@ -6,6 +6,7 @@
 #define HOLD_SLEEP_MS       2500
 #define BT_MODE_HOLD_MS     4000
 #define CLICK_MAX_MS         400
+#define SINGLE_WIN_MS        600  // délai de confirmation simple clic (pas de 2ème appui attendu)
 #define TRIPLE_WIN_MS       1000
 
 static bool          _pressing      = false;
@@ -66,9 +67,17 @@ ButtonEvent buttonLoop()
         }
     }
 
-    if (_clickCount > 0 && (millis() - _firstClickAt) > TRIPLE_WIN_MS)
+    // Simple clic confirmé si aucun 2ème appui dans SINGLE_WIN_MS
+    if (_clickCount == 1 && (millis() - _firstClickAt) > SINGLE_WIN_MS)
     {
-        Serial.println("[BTN] fenêtre triple-click expirée");
+        _clickCount = 0;
+        Serial.println("[BTN] simple clic confirmé");
+        return BTN_SINGLE_CLICK;
+    }
+    // Fenêtre triple-click expirée sans atteindre 3 clics
+    if (_clickCount > 1 && (millis() - _firstClickAt) > TRIPLE_WIN_MS)
+    {
+        Serial.printf("[BTN] fenêtre expirée (%d clics ignorés)\n", _clickCount);
         _clickCount = 0;
     }
 

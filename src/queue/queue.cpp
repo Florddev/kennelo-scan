@@ -1,6 +1,4 @@
 #include "queue.h"
-#include "../api/api.h"
-#include "../wifi/wifi.h"
 #include <Preferences.h>
 #include <string.h>
 
@@ -20,30 +18,24 @@ void queuePush(const char *tagId, time_t timestamp)
     _queueSize++;
 }
 
-static void removeFirst()
+bool queuePeekFront(char *tagId, int maxLen, time_t *timestamp)
 {
+    if (_queueSize == 0) return false;
+    strncpy(tagId, _queue[0], maxLen - 1);
+    tagId[maxLen - 1] = '\0';
+    if (timestamp) *timestamp = _timestamps[0];
+    return true;
+}
+
+void queuePopFront()
+{
+    if (_queueSize == 0) return;
     for (int i = 0; i < _queueSize - 1; i++)
     {
         strncpy(_queue[i], _queue[i + 1], TAG_MAX_LEN);
         _timestamps[i] = _timestamps[i + 1];
     }
     _queueSize--;
-}
-
-void queueFlush()
-{
-    bool changed = false;
-    while (_queueSize > 0 && wifiIsConnected())
-    {
-        if (apiSend(_queue[0], _timestamps[0]).ok)
-        {
-            removeFirst();
-            changed = true;
-        }
-        else break;
-        delay(200);
-    }
-    if (changed) queueSave();
 }
 
 void queueLoad()
